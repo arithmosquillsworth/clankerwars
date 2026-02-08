@@ -6,6 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+interface IStakingPool {
+    function transferFees(uint256 amount) external;
+}
+
 /**
  * @title PrizeDistributor
  * @notice Handles prize distribution with 2.5% protocol fee
@@ -24,6 +28,7 @@ contract PrizeDistributor is Ownable, ReentrancyGuard {
     IERC20 public immutable stakingToken;
     address public coreContract;
     address public protocolTreasury;
+    address public stakingPool;
     
     // Accumulated fees
     uint256 public accumulatedFees;
@@ -81,6 +86,15 @@ contract PrizeDistributor is Ownable, ReentrancyGuard {
     function setCoreContract(address _coreContract) external onlyOwner {
         require(coreContract == address(0), "Already set");
         coreContract = _coreContract;
+    }
+    
+    /**
+     * @notice Set the staking pool address
+     * @param _stakingPool The StakingPool address
+     */
+    function setStakingPool(address _stakingPool) external onlyOwner {
+        require(stakingPool == address(0), "Already set");
+        stakingPool = _stakingPool;
     }
     
     /**
@@ -200,6 +214,11 @@ contract PrizeDistributor is Ownable, ReentrancyGuard {
         if (amount == 0) revert NoFeesToWithdraw();
         
         accumulatedFees = 0;
+        
+        // Pull fees from staking pool
+        IStakingPool(stakingPool).transferFees(amount);
+        
+        // Now transfer to treasury
         stakingToken.safeTransfer(protocolTreasury, amount);
         
         emit FeesWithdrawn(protocolTreasury, amount);

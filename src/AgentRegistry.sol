@@ -17,6 +17,7 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
     mapping(bytes32 => bool) public strategyHashUsed;
     
     address[] public allAgents;
+    address public coreContract;
     
     uint256 public constant INITIAL_ELO = 1200;
     uint256 public constant MIN_REGISTRATION_FEE = 0.001 ether;
@@ -56,10 +57,20 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
     error NotAgentOwner();
     error AgentBanned();
     error AgentRetired();
+    error Unauthorized();
     
     // ============ Constructor ============
     
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the core contract address
+     * @param _coreContract The ClankerWarsCore address
+     */
+    function setCoreContract(address _coreContract) external {
+        require(coreContract == address(0), "Already set");
+        coreContract = _coreContract;
+    }
     
     // ============ External Functions ============
     
@@ -72,13 +83,36 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         bytes32 strategyHash,
         string calldata metadataURI
     ) external payable nonReentrant {
-        if (isAgent[msg.sender]) revert AgentAlreadyRegistered();
+        _registerAgent(msg.sender, strategyHash, metadataURI);
+    }
+    
+    /**
+     * @notice Register a new agent (for core contract)
+     * @param agent Address of the agent
+     * @param strategyHash Hash of the agent's strategy configuration
+     * @param metadataURI IPFS or other URI to agent metadata
+     */
+    function registerAgentFor(
+        address agent,
+        bytes32 strategyHash,
+        string calldata metadataURI
+    ) external payable nonReentrant {
+        if (msg.sender != coreContract) revert Unauthorized();
+        _registerAgent(agent, strategyHash, metadataURI);
+    }
+    
+    function _registerAgent(
+        address agent,
+        bytes32 strategyHash,
+        string calldata metadataURI
+    ) internal {
+        if (isAgent[agent]) revert AgentAlreadyRegistered();
         if (strategyHash == bytes32(0)) revert InvalidStrategyHash();
         if (strategyHashUsed[strategyHash]) revert StrategyHashAlreadyUsed();
         if (msg.value < registrationFee) revert InsufficientFee();
         
-        agents[msg.sender] = ClankerWarsTypes.Agent({
-            owner: msg.sender,
+        agents[agent] = ClankerWarsTypes.Agent({
+            owner: agent,
             strategyHash: strategyHash,
             metadataURI: metadataURI,
             eloRating: INITIAL_ELO,
@@ -90,13 +124,13 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
             registeredAt: block.timestamp
         });
         
-        isAgent[msg.sender] = true;
+        isAgent[agent] = true;
         strategyHashUsed[strategyHash] = true;
-        allAgents.push(msg.sender);
+        allAgents.push(agent);
         
         emit AgentRegistered(
-            msg.sender,
-            msg.sender,
+            agent,
+            agent,
             strategyHash,
             INITIAL_ELO,
             metadataURI

@@ -88,8 +88,10 @@ contract BattleFactory is Ownable, ReentrancyGuard {
         _;
     }
     
-    modifier onlyOracle() {
-        if (msg.sender != oracleContract) revert NotOracle();
+    modifier onlyOracleOrCore() {
+        if (msg.sender != oracleContract && msg.sender != coreContract) {
+            revert NotOracle();
+        }
         _;
     }
     
@@ -197,7 +199,7 @@ contract BattleFactory is Ownable, ReentrancyGuard {
         uint256 battleId,
         address winner,
         bytes32 resolutionData
-    ) external onlyOracle {
+    ) external onlyOracleOrCore {
         ClankerWarsTypes.Battle storage battle = battles[battleId];
         
         if (battle.id == 0) revert BattleNotFound();

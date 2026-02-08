@@ -185,21 +185,23 @@ contract ELOMatchmaking {
         uint256 eloB
     ) external view returns (bool) {
         if (agentA == agentB) return false;
-        
-        // Check cooldowns
-        if (block.timestamp < lastBattleTime[agentA] + MATCHMAKING_COOLDOWN) {
+
+        // Check cooldowns (allow if never battled - lastBattleTime is 0)
+        uint256 lastBattleA = lastBattleTime[agentA];
+        uint256 lastBattleB = lastBattleTime[agentB];
+        if (lastBattleA > 0 && block.timestamp < lastBattleA + MATCHMAKING_COOLDOWN) {
             return false;
         }
-        if (block.timestamp < lastBattleTime[agentB] + MATCHMAKING_COOLDOWN) {
+        if (lastBattleB > 0 && block.timestamp < lastBattleB + MATCHMAKING_COOLDOWN) {
             return false;
         }
-        
+
         // Check ELO range
         uint256 eloDiff = eloA > eloB ? eloA - eloB : eloB - eloA;
         if (eloDiff > MATCHMAKING_RANGE_MAX) {
             return false;
         }
-        
+
         return true;
     }
     
@@ -238,8 +240,9 @@ contract ELOMatchmaking {
         for (uint256 i = 0; i < candidates.length; i++) {
             if (candidates[i] == agent) continue;
             
-            // Check cooldown
-            if (block.timestamp < lastBattleTime[candidates[i]] + MATCHMAKING_COOLDOWN) {
+            // Check cooldown (skip if never battled)
+            uint256 lastBattle = lastBattleTime[candidates[i]];
+            if (lastBattle > 0 && block.timestamp < lastBattle + MATCHMAKING_COOLDOWN) {
                 continue;
             }
             

@@ -44,8 +44,8 @@ contract ClankerWarsCoreTest is Test {
         oracle = new MockOracle(address(core));
         core.initializeOracle(address(oracle));
         
-        core.battleFactory().addMarket(market);
-        core.battleFactory().addBattleCreator(owner);
+        core.addMarket(market);
+        core.addBattleCreator(owner);
         
         // Enable auto-resolve for oracle
         oracle.setAutoResolve(false, address(0));
@@ -132,10 +132,16 @@ contract ClankerWarsCoreTest is Test {
         vm.prank(owner);
         uint256 battleId = core.createBattle(agentA, agentB, market, 4 hours);
         
-        // User stakes
+        // User stakes on agentA
         vm.startPrank(user1);
         token.approve(address(core), 100e6);
         core.placeStake(battleId, agentA, 100e6);
+        vm.stopPrank();
+        
+        // User2 stakes on agentB (creates prize pool)
+        vm.startPrank(user2);
+        token.approve(address(core), 100e6);
+        core.placeStake(battleId, agentB, 100e6);
         vm.stopPrank();
         
         assertEq(core.stakingPool().userTotalStake(user1), 100e6);
@@ -205,7 +211,7 @@ contract ClankerWarsCoreTest is Test {
         uint256 treasuryBalanceBefore = token.balanceOf(treasury);
         
         vm.prank(owner);
-        core.prizeDistributor().withdrawFees();
+        core.withdrawProtocolFees();
         
         uint256 treasuryBalanceAfter = token.balanceOf(treasury);
         assertEq(treasuryBalanceAfter - treasuryBalanceBefore, expectedFee);

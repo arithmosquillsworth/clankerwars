@@ -125,10 +125,13 @@ contract ELOMatchmakingTest is Test {
         uint256 quality = matchmaking.getMatchQuality(1200, 1200);
         assertEq(quality, 100); // Perfect match
         
-        quality = matchmaking.getMatchQuality(1200, 1500);
-        assertEq(quality, 0); // Too far apart
+        quality = matchmaking.getMatchQuality(1200, 1700); // 500 diff = max
+        assertEq(quality, 0); // At max range
         
-        quality = matchmaking.getMatchQuality(1200, 1250);
+        quality = matchmaking.getMatchQuality(1200, 1250); // 50 diff
         assertEq(quality, 90); // Good match
+        
+        quality = matchmaking.getMatchQuality(1200, 1500); // 300 diff
+        assertEq(quality, 40); // Okay match
     }
 }

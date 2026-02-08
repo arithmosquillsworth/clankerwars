@@ -98,8 +98,11 @@ contract ClankerWarsCore is Ownable, ReentrancyGuard {
         battleFactory = new BattleFactory();
         
         // Set this contract as core for sub-contracts
+        agentRegistry.setCoreContract(address(this));
         stakingPool.setCoreContract(address(this));
+        stakingPool.setPrizeDistributor(address(prizeDistributor));
         prizeDistributor.setCoreContract(address(this));
+        prizeDistributor.setStakingPool(address(stakingPool));
         // battleFactory core contracts set in initializeOracle
     }
     
@@ -124,7 +127,7 @@ contract ClankerWarsCore is Ownable, ReentrancyGuard {
         bytes32 strategyHash,
         string calldata metadataURI
     ) external payable {
-        agentRegistry.registerAgent{value: msg.value}(strategyHash, metadataURI);
+        agentRegistry.registerAgentFor{value: msg.value}(msg.sender, strategyHash, metadataURI);
     }
     
     /**
@@ -189,12 +192,6 @@ contract ClankerWarsCore is Ownable, ReentrancyGuard {
         battleId = battleFactory.createBattle(agent, opponent, market, duration);
     }
     
-    /**
-     * @notice Place a stake on an agent for a battle
-     * @param battleId Battle ID
-     * @param agent Agent to stake on
-     * @param amount Amount to stake
-     */
     function placeStake(
         uint256 battleId,
         address agent,
@@ -204,19 +201,21 @@ contract ClankerWarsCore is Ownable, ReentrancyGuard {
         ClankerWarsTypes.Battle memory battle = battleFactory.getBattle(battleId);
         if (battle.status != ClankerWarsTypes.BattleStatus.Active) revert BattleCreationFailed();
         if (agent != battle.agentA && agent != battle.agentB) revert Unauthorized();
-        
-        // Approve tokens for staking pool
+
+        // Transfer tokens from user to this contract first
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Approve staking pool to pull tokens
         stakingToken.approve(address(stakingPool), amount);
-        
-        // Place stake through staking pool
-        stakingPool.stake(battleId, agent, amount);
-        
+
+        // Place stake through staking pool (for the user)
+        stakingPool.stakeFor(battleId, msg.sender, agent, amount);
+
         // Update battle pools in factory
         uint256 poolA = stakingPool.totalStakedOnAgent(battleId, battle.agentA);
         uint256 poolB = stakingPool.totalStakedOnAgent(battleId, battle.agentB);
         battleFactory.updateStakePools(battleId, poolA, poolB);
-        
+
         emit StakePlacedAndTracked(battleId, msg.sender, agent, amount);
     }
     
@@ -306,7 +305,7 @@ contract ClankerWarsCore is Ownable, ReentrancyGuard {
      * @param agent Agent staked on
      */
     function claimWinnings(uint256 battleId, address agent) external nonReentrant {
-        stakingPool.claimWinnings(battleId, agent);
+        stakingPool.claimWinningsFor(msg.sender, battleId, agent);
     }
     
     /**
@@ -362,6 +361,38 @@ contract ClankerWarsCore is Ownable, ReentrancyGuard {
     // ============ Admin Functions ============
     
     /**
+     * @notice Add a valid market for battles
+     * @param market Market address (e.g., price feed)
+     */
+    function addMarket(address market) external onlyOwner {
+        battleFactory.addMarket(market);
+    }
+    
+    /**
+     * @notice Remove a market
+     * @param market Market address
+     */
+    function removeMarket(address market) external onlyOwner {
+        battleFactory.removeMarket(market);
+    }
+    
+    /**
+     * @notice Add battle creator
+     * @param creator Address that can create battles
+     */
+    function addBattleCreator(address creator) external onlyOwner {
+        battleFactory.addBattleCreator(creator);
+    }
+    
+    /**
+     * @notice Remove battle creator
+     * @param creator Address to remove
+     */
+    function removeBattleCreator(address creator) external onlyOwner {
+        battleFactory.removeBattleCreator(creator);
+    }
+    
+    /**
      * @notice Toggle auto-matchmaking
      */
     function setAutoMatchmaking(bool enabled) external onlyOwner {
@@ -373,6 +404,13 @@ contract ClankerWarsCore is Ownable, ReentrancyGuard {
      */
     function emergencyCancelBattle(uint256 battleId, string calldata reason) external onlyOwner {
         battleFactory.cancelBattle(battleId, reason);
+    }
+    
+    /**
+     * @notice Withdraw accumulated protocol fees
+     */
+    function withdrawProtocolFees() external onlyOwner {
+        prizeDistributor.withdrawFees();
     }
     
     /**

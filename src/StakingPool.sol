@@ -17,6 +17,7 @@ contract StakingPool is ReentrancyGuard {
     
     IERC20 public immutable stakingToken; // USDC or other stable
     address public coreContract;
+    address public prizeDistributor;
     
     // Battle ID => Stakes array
     mapping(uint256 => ClankerWarsTypes.Stake[]) public battleStakes;
@@ -102,28 +103,48 @@ contract StakingPool is ReentrancyGuard {
     }
     
     /**
-     * @notice Place a stake on an agent for a battle
+     * @notice Set the prize distributor address
+     * @param _prizeDistributor The PrizeDistributor address
+     */
+    function setPrizeDistributor(address _prizeDistributor) external onlyCore {
+        require(prizeDistributor == address(0), "Already set");
+        prizeDistributor = _prizeDistributor;
+    }
+    
+    /**
+     * @notice Transfer accumulated fees to prize distributor (called by core or prize distributor)
+     * @param amount Amount to transfer
+     */
+    function transferFees(uint256 amount) external {
+        require(msg.sender == coreContract || msg.sender == prizeDistributor, "Unauthorized");
+        stakingToken.safeTransfer(prizeDistributor, amount);
+    }
+    
+    /**
+     * @notice Place a stake on an agent for a battle (called by core)
      * @param battleId The battle ID
+     * @param user The user placing the stake
      * @param agent The agent to stake on
      * @param amount Amount to stake
      */
-    function stake(
+    function stakeFor(
         uint256 battleId,
+        address user,
         address agent,
         uint256 amount
-    ) external nonReentrant {
+    ) external onlyCore nonReentrant {
         if (amount < minStake) revert BelowMinStake();
         if (amount > maxStake) revert AboveMaxStake();
         if (amount == 0) revert InvalidAmount();
-        
-        // Transfer tokens from user
+
+        // Transfer tokens from core contract (tokens were already pulled from user by core)
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
-        
+
         // Create stake record
         uint256 stakeIdx = battleStakes[battleId].length;
-        
+
         battleStakes[battleId].push(ClankerWarsTypes.Stake({
-            user: msg.sender,
+            user: user,
             agent: agent,
             amount: amount,
             battleId: battleId,
@@ -131,13 +152,13 @@ contract StakingPool is ReentrancyGuard {
             claimed: false,
             winnings: 0
         }));
-        
-        userStakeIndex[battleId][msg.sender][agent] = stakeIdx;
+
+        userStakeIndex[battleId][user][agent] = stakeIdx;
         totalStakedOnAgent[battleId][agent] += amount;
-        userTotalStake[msg.sender] += amount;
+        userTotalStake[user] += amount;
         totalStakes++;
-        
-        emit StakePlaced(battleId, msg.sender, agent, amount, stakeIdx);
+
+        emit StakePlaced(battleId, user, agent, amount, stakeIdx);
     }
     
     /**
@@ -156,25 +177,26 @@ contract StakingPool is ReentrancyGuard {
     }
     
     /**
-     * @notice Claim winnings for a resolved battle
+     * @notice Claim winnings for a resolved battle (called by core)
+     * @param user The user claiming winnings
      * @param battleId The battle ID
      * @param agent The agent staked on
      */
-    function claimWinnings(uint256 battleId, address agent) external nonReentrant {
-        uint256 stakeIdx = userStakeIndex[battleId][msg.sender][agent];
+    function claimWinningsFor(address user, uint256 battleId, address agent) external onlyCore nonReentrant {
+        uint256 stakeIdx = userStakeIndex[battleId][user][agent];
         ClankerWarsTypes.Stake storage s = battleStakes[battleId][stakeIdx];
         
-        if (s.user != msg.sender) revert NoStakeFound();
+        if (s.user != user) revert NoStakeFound();
         if (s.claimed) revert AlreadyClaimed();
         if (s.winnings == 0) revert BattleNotResolved();
         
         s.claimed = true;
-        userTotalStake[msg.sender] -= s.amount;
+        userTotalStake[user] -= s.amount;
         
-        // Transfer winnings
-        stakingToken.safeTransfer(msg.sender, s.winnings);
+        // Transfer winnings to user
+        stakingToken.safeTransfer(user, s.winnings);
         
-        emit WinningsClaimed(battleId, msg.sender, s.winnings);
+        emit WinningsClaimed(battleId, user, s.winnings);
     }
     
     /**
