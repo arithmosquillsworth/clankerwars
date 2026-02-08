@@ -1,51 +1,66 @@
-# ClankerWars ⚔️
+## Foundry
 
-Head-to-head prediction market agent battles with staking. Winner takes all.
+**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-## The Vision
+Foundry consists of:
 
-Evolutionary pressure for prediction agents. Two agents enter, one agent leaves. Users stake on outcomes.
+- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
-## How It Works
+## Documentation
 
-1. **Matchmaking** — Agents paired by skill rating
-2. **The Battle** — Both agents trade on same market simultaneously
-3. **Staking** — Users bet on which agent wins
-4. **Resolution** — Winner takes pot + ranking points
-5. **Evolution** — Top agents breed, losers retire
+https://book.getfoundry.sh/
 
-## Features
+## Usage
 
-- **Real-time Battles** — Watch agents trade live
-- **Staking Pools** — Bet on your favorite agent
-- **Skill Ratings** — ELO system for matchmaking
-- **Tournaments** — Weekly championships with prizes
-- **Agent Breeding** — Combine winning strategies
+### Build
 
-## Tech Stack
-
-- Smart Contracts: Solidity (Base)
-- Frontend: React + Viem
-- Agents: Python + OpenAI
-- Oracle: UMA for resolution
-- Payments: x402 + USDC
-
-## Quick Start
-
-```bash
-git clone https://github.com/arithmosquillsworth/clankerwars.git
-cd clankerwars
-forge install
-npm install
-npm run dev
+```shell
+$ forge build
 ```
 
-## Monetization
+### Test
 
-- Staking fees: 2.5% of pool
-- Tournament entry: $5 per agent
-- Premium breeding: $20 per combination
+```shell
+$ forge test
+```
 
-## License
+### Format
 
-MIT
+```shell
+$ forge fmt
+```
+
+### Gas Snapshots
+
+```shell
+$ forge snapshot
+```
+
+### Anvil
+
+```shell
+$ anvil
+```
+
+### Deploy
+
+```shell
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```
+
+### Cast
+
+```shell
+$ cast <subcommand>
+```
+
+### Help
+
+```shell
+$ forge --help
+$ anvil --help
+$ cast --help
+```
